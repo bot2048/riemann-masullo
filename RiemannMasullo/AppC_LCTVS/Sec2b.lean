@@ -3626,6 +3626,33 @@ theorem id_mem_closure_finiteRank_iff_dense :
   rw [← hA]
   exact closure_mono hsub (image_closure_subset_closure_image post.continuous (mem_image_of_mem _ h))
 
+omit [IsUniformAddGroup E] [PolynormableSpace ℂ E] [T2Space E] in
+/-- Postcomposition carries the bounded-convergence closure of finite-rank maps into
+the bounded-convergence closure of finite-rank maps with the new target. -/
+private theorem postcomp_mem_closure_finiteRank {F G : Type*}
+    [AddCommGroup F] [Module ℂ F] [TopologicalSpace F] [IsTopologicalAddGroup F]
+    [PolynormableSpace ℂ F]
+    [AddCommGroup G] [Module ℂ G] [TopologicalSpace G] [IsTopologicalAddGroup G]
+    [PolynormableSpace ℂ G]
+    (A : F →L[ℂ] G) {T : E →L[ℂ] F}
+    (hT : T ∈ closure (range (tensorToFiniteRank (E := E) (F := F)))) :
+    A.comp T ∈ closure (range (tensorToFiniteRank (E := E) (F := G))) := by
+  let post : (E →L[ℂ] F) →L[ℂ] E →L[ℂ] G := ContinuousLinearMap.postcomp E A
+  let push := TensorProduct.map (LinearMap.id : StrongDual ℂ E →ₗ[ℂ] StrongDual ℂ E) A.toLinearMap
+  have hpush (z : StrongDual ℂ E ⊗[ℂ] F) :
+      post (tensorToFiniteRank z) = tensorToFiniteRank (push z) := by
+    induction z using TensorProduct.inductionOn with
+    | tmul φ y =>
+      ext x
+      change A (tensorToFiniteRank (φ ⊗ₜ[ℂ] y) x) = tensorToFiniteRank (push (φ ⊗ₜ[ℂ] y)) x
+      simp [push, tensorToFiniteRank_tmul]
+    | add z w hz hw => simp only [map_add, hz, hw]
+  have hsub : post '' range (tensorToFiniteRank (E := E) (F := F)) ⊆
+      range (tensorToFiniteRank (E := E) (F := G)) := by
+    rintro _ ⟨_, ⟨z, rfl⟩, rfl⟩
+    exact ⟨push z, (hpush z).symm⟩
+  exact closure_mono hsub (image_closure_subset_closure_image post.continuous (mem_image_of_mem _ hT))
+
 /-- Paper: Lemma C.2.4.15(2)–(3), p. 689. Density of finite-rank maps for the
 precompact convergence topology on endomorphisms is equivalent to the corresponding
 density for all targets. -/
@@ -3635,7 +3662,26 @@ theorem dense_finiteRank_iff_forall_targets :
       ∀ (F : Type (max u v)) (_ : AddCommGroup F) (_ : Module ℂ F) (_ : TopologicalSpace F)
         (_ : IsTopologicalAddGroup F) (_ : PolynormableSpace ℂ F) (_ : T2Space F),
         DenseRange (tensorToFiniteRank (E := E) (F := F) :
-          StrongDual ℂ E ⊗[ℂ] F → PrecompactConvergenceCLM E F) := by sorry
+          StrongDual ℂ E ⊗[ℂ] F → PrecompactConvergenceCLM E F) := by
+  constructor
+  · intro hdense F _ _ _ _ _ _ A
+    simpa only [ContinuousLinearMap.comp_id] using
+      postcomp_mem_closure_finiteRank E A (hdense (ContinuousLinearMap.id ℂ E))
+  · intro hforall T
+    let G := ULift.{max u v, u} E
+    let e : G ≃ₗ[ℂ] E := ULift.moduleEquiv
+    let h : G ≃ₜ E := Homeomorph.ulift
+    have hGpolyn : PolynormableSpace ℂ G := h.isInducing.polynormableSpace (f := e.toLinearMap)
+    have hGadd : IsTopologicalAddGroup G := PolynormableSpace.isTopologicalAddGroup ℂ G
+    have hGT2 : T2Space G := h.symm.t2Space
+    let down : G →L[ℂ] E := ⟨e.toLinearMap, h.continuous⟩
+    let up : E →L[ℂ] G := ⟨e.symm.toLinearMap, h.symm.continuous⟩
+    have hT : down.comp (up.comp T) = T := by
+      ext x
+      exact e.apply_symm_apply (T x)
+    rw [← hT]
+    exact postcomp_mem_closure_finiteRank E down
+      (hforall G inferInstance inferInstance inferInstance hGadd hGpolyn hGT2 (up.comp T))
 
 /-- Applying the pulled-back tensor of finite-rank maps precomposes the operator: for a
 differential `b` of the source, `λ(Σ φᵢ ⊗ yᵢ) ∘ b = λ(Σ (φᵢ ∘ b) ⊗ yᵢ)`. -/
