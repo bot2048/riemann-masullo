@@ -285,16 +285,6 @@ theorem completedHeckeL_continuation_simplePoles (χ : U[F]) (L : ℂ → ℂ)
 -- Euler product normalization. For the trivial character of ℚ(√5), the residue at 1
 -- is already the Appendix A.3.2.1 class volume, since both real gamma factors equal 1.
 
-/-- Paper: Proposition 3.2.1.3(3), p. 123. Reflecting the continuation of the
-inverse unitary character gives the original continuation times a nowhere-vanishing
-entire function. Inversion agrees with complex conjugation for a unitary character. -/
-theorem completedHeckeL_continuation_functionalEquation (χ : U[F]) (L Ldual : ℂ → ℂ)
-    (hL : MeromorphicNFOn L univ) (h : ∀ s : halfPlane, L s = completedHeckeL χ s)
-    (hLdual : MeromorphicNFOn Ldual univ)
-    (hdual : ∀ s : halfPlane, Ldual s = completedHeckeL χ⁻¹ s) :
-    ∃ ε : ℂ → ℂ, Differentiable ℂ ε ∧ (∀ s, ε s ≠ 0) ∧
-      ∀ s, Ldual (1 - s) = ε s * L s := by sorry
-
 /-- Paper: Proposition 3.2.1.3(4), p. 123. A zero of the continuation in
 the positive half-plane lies strictly to the left of `Re(s) = 1`. -/
 theorem completedHeckeL_continuation_zeros (χ : U[F]) (L : ℂ → ℂ)
@@ -758,6 +748,129 @@ and taking the norm times the inverse character preserves its global Z-function 
 theorem globalIdelicZFunction_functionalEquation (f : ℬ[F]) (c : 𝒳[F]) :
     globalIdelicZFunction f c = globalIdelicZFunction (adeleSchwartzFourier f)
       (dualQuasiCharacter (ideleClassNorm F) (isProperMap_ideleClassNorm F).continuous c) := by sorry
+
+local notation "archimedeanFourier" =>
+  fun (f : SchwartzBruhat (Multiplicative (SAdeleRing F ∅))) (y : SAdeleRing F ∅) ↦
+    @tamagawaFourier _ _ (instMeasurableSpaceSAdeleRing (F := F) (S := ∅))
+      (sAdditiveTamagawaMeasure F ∅) (sAdeleStandardCharacter F ∅)
+      (fun x ↦ f (Multiplicative.ofAdd x)) y
+
+/-- Paper: Equations (3.4.3.3)–(3.4.3.6), p. 152. Choose archimedean Gaussians
+for a unitary character and its inverse whose zeta integrals equal their gamma factors.
+The trace-pairing Fourier transform exchanges the two Gaussians up to a nonzero scalar.
+Deviation: The complex monomials have angular weight opposite to the character. -/
+theorem exists_archimedeanHeckeTest_fourier (χ : U[F]) :
+    ∃ (f fdual : SchwartzBruhat (Multiplicative (SAdeleRing F ∅))) (c : ℂ), c ≠ 0 ∧
+      (∀ y, archimedeanFourier f y = c * fdual (Multiplicative.ofAdd y)) ∧
+      (∀ s : halfPlane, archimedeanZeta f (ideleClassNormTwist χ s) = heckeGammaFactor χ s) ∧
+      (∀ s : halfPlane,
+        archimedeanZeta fdual (ideleClassNormTwist χ⁻¹ s) = heckeGammaFactor χ⁻¹ s) := by
+  sorry
+
+/-- Paper: Proposition 3.2.1.3(3), p. 123 and Equations (3.4.3.7)–(3.4.3.9),
+p. 152. Extend the archimedean test by integer-ring indicators at unramified finite places
+and inverse character weights on integer units at ramified places. In the right half-plane,
+the finite factors of the two zeta integrals are the Euler products for the character and
+its inverse. The Fourier-transformed finite test gives a nonzero scalar and a positive
+real scale raised to the exponent, from the different and the character conductor. -/
+theorem exists_globalHeckeTest_fourier (χ : U[F])
+    (fArch fArchDual : SchwartzBruhat (Multiplicative (SAdeleRing F ∅)))
+    (c : ℂ) (hc : c ≠ 0)
+    (hFourier : ∀ y, archimedeanFourier fArch y = c * fArchDual (Multiplicative.ofAdd y)) :
+    ∃ (f : ℬ[F]) (a b : ℂ) (q : ℝ), a ≠ 0 ∧ b ≠ 0 ∧ 0 < q ∧
+      (∀ s : halfPlane, globalIdelicZetaIntegral f (ideleClassNormTwist χ s) =
+        a * (archimedeanZeta fArch (ideleClassNormTwist χ s) * finiteHeckeL χ s)) ∧
+      (∀ s : halfPlane,
+        globalIdelicZetaIntegral (adeleSchwartzFourier f) (ideleClassNormTwist χ⁻¹ s) =
+          (b * (q : ℂ) ^ (s : ℂ)) *
+            (archimedeanZeta fArchDual (ideleClassNormTwist χ⁻¹ s) * finiteHeckeL χ⁻¹ s)) := by
+  sorry
+
+/-- An entire nonzero multiple of the completed series determines the corresponding
+global idelic Z-function whenever it agrees with the zeta integral on the right half-plane. -/
+private theorem globalIdelicZFunction_eq_mul_completedHeckeL_of_integral
+    (f : ℬ[F]) (χ : U[F]) (L A : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (h : ∀ s : halfPlane, L s = completedHeckeL χ s)
+    (hA : Differentiable ℂ A) (hA₀ : ∀ s, A s ≠ 0)
+    (hIntegral : ∀ s : halfPlane, globalIdelicZetaIntegral f (ideleClassNormTwist χ s) =
+      A s * completedHeckeL χ s) (s : ℂ) :
+    globalIdelicZFunction f (ideleClassNormTwist χ s) = A s * L s := by
+  let Z (z : ℂ) := globalIdelicZFunction f (ideleClassNormTwist χ z)
+  have hZ : MeromorphicNFOn Z univ := globalIdelicZFunction_meromorphic f χ
+  have hAL : MeromorphicNFOn (A * L) univ := fun z hz ↦
+    (meromorphicNFAt_mul_iff_right (hA.analyticAt z) (hA₀ z)).2 (hL hz)
+  have hAgree (z : halfPlane) : Z z = (A * L) z := by
+    have hz : ideleClassNormTwist χ z ∈ rightHalf := by
+      change 1 < quasiCharacterAbscissa (ideleClassNorm F) _ _ _
+      rw [quasiCharacterAbscissa_of_unitary_twist (ideleClassNorm F)
+        (isProperMap_ideleClassNorm F) (ideleClassNorm_ne_one (F := F))
+        (ideleClassNormTwist χ z) χ z (fun _ ↦ rfl)]
+      exact z.property
+    change globalIdelicZFunction f (ideleClassNormTwist χ z) = A z * L z
+    rw [globalIdelicZFunction_eq_integral f hz, hIntegral z, h z]
+  have hAtTwo : meromorphicOrderAt (Z - A * L) 2 = ⊤ := by
+    apply meromorphicOrderAt_eq_top_iff.mpr
+    have hNear : ∀ᶠ z in 𝓝 (2 : ℂ), 1 < z.re :=
+      (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+    filter_upwards [hNear.filter_mono nhdsWithin_le_nhds] with z hz
+    exact sub_eq_zero.mpr (hAgree ⟨z, hz⟩)
+  have hOrder := (hZ.meromorphicOn.sub hAL.meromorphicOn).meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ s) hAtTwo
+  have hPunctured : Z =ᶠ[𝓝[≠] s] A * L :=
+    (meromorphicOrderAt_eq_top_iff.mp hOrder).mono fun _ hz ↦ sub_eq_zero.mp hz
+  exact (((hZ (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds
+    (hAL (mem_univ s))).mp hPunctured).eq_of_nhds
+
+/-- Paper: Equation (3.1.1.4), p. 119. Duality in the norm-twist coordinate
+takes the inverse unitary character and reflects the exponent. -/
+private theorem dualQuasiCharacter_ideleClassNormTwist (χ : U[F]) (s : ℂ) :
+    dualQuasiCharacter (ideleClassNorm F) (isProperMap_ideleClassNorm F).continuous
+      (ideleClassNormTwist χ s) = ideleClassNormTwist χ⁻¹ (1 - s) := by
+  ext1 g
+  let N : ℂ := (classNormℝ g : ℂ)
+  have hN : N ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (ideleClassNorm F g).ne_zero)
+  change N * ideleClassNormTwist χ s g⁻¹ = ideleClassNormTwist χ⁻¹ (1 - s) g
+  rw [map_inv]
+  change N * ((χ g : ℂ) * N ^ s)⁻¹ = (χ g : ℂ)⁻¹ * N ^ (1 - s)
+  rw [mul_inv_rev, Complex.cpow_sub 1 s hN, Complex.cpow_one, div_eq_mul_inv]
+  ac_rfl
+
+/-- Paper: Proposition 3.2.1.3(3), p. 123. Reflecting the continuation of the
+inverse unitary character gives the original continuation times a nowhere-vanishing
+entire function. Inversion agrees with complex conjugation for a unitary character. -/
+theorem completedHeckeL_continuation_functionalEquation (χ : U[F]) (L Ldual : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (h : ∀ s : halfPlane, L s = completedHeckeL χ s)
+    (hLdual : MeromorphicNFOn Ldual univ)
+    (hdual : ∀ s : halfPlane, Ldual s = completedHeckeL χ⁻¹ s) :
+    ∃ ε : ℂ → ℂ, Differentiable ℂ ε ∧ (∀ s, ε s ≠ 0) ∧
+      ∀ s, Ldual (1 - s) = ε s * L s := by
+  obtain ⟨fArch, fArchDual, c, hc, hFourier, hArch, hArchDual⟩ :=
+    exists_archimedeanHeckeTest_fourier χ
+  obtain ⟨f, a, b, q, ha, hb, hq, hf, hFourierIntegral⟩ :=
+    exists_globalHeckeTest_fourier χ fArch fArchDual c hc hFourier
+  let B (s : ℂ) := b * (q : ℂ) ^ s
+  have hq₀ : (q : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hq.ne'
+  have hB : Differentiable ℂ B :=
+    (differentiable_id.const_cpow (Or.inl hq₀)).const_mul b
+  have hB₀ (s : ℂ) : B s ≠ 0 :=
+    mul_ne_zero hb (fun hz ↦ hq₀ ((Complex.cpow_eq_zero_iff _ _).mp hz).1)
+  have hZ := globalIdelicZFunction_eq_mul_completedHeckeL_of_integral f χ L (fun _ ↦ a)
+    hL h (differentiable_const a) (fun _ ↦ ha) (fun s ↦ by
+      rw [hf s, hArch s]
+      rfl)
+  have hZdual := globalIdelicZFunction_eq_mul_completedHeckeL_of_integral
+    (adeleSchwartzFourier f) χ⁻¹ Ldual B hLdual hdual hB hB₀ (fun s ↦ by
+      rw [hFourierIntegral s, hArchDual s]
+      rfl)
+  have hReflect : Differentiable ℂ (fun s : ℂ ↦ 1 - s) :=
+    (differentiable_const (1 : ℂ)).sub differentiable_id
+  refine ⟨fun s ↦ (B (1 - s))⁻¹ * a,
+    ((hB.comp hReflect).inv (fun s ↦ hB₀ (1 - s))).mul_const a,
+    fun s ↦ mul_ne_zero (inv_ne_zero (hB₀ (1 - s))) ha, fun s ↦ ?_⟩
+  have hEq := globalIdelicZFunction_functionalEquation f (ideleClassNormTwist χ s)
+  rw [dualQuasiCharacter_ideleClassNormTwist, hZ s, hZdual (1 - s)] at hEq
+  rw [mul_assoc, hEq, ← mul_assoc, inv_mul_cancel₀ (hB₀ (1 - s)), one_mul]
 
 /-- Paper: Equation (3.2.2.3), p. 124. The theta Mellin integral is the idele-class
 Tamagawa integral of the global theta function against the quasi-character. -/
