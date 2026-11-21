@@ -425,7 +425,18 @@ def adelicEigendistributions (c : X) : Submodule ℂ (StrongDual ℂ ℬ(𝔸[F]
 evaluation at the zero adele is an eigendistribution. -/
 theorem adelicEigendistributions_zeroEval :
     ∃ T : StrongDual ℂ ℬ(𝔸[F]), T ∈ adelicEigendistributions (1 : X) ∧
-      ∀ f : ℬ(𝔸[F]), T f = f (Multiplicative.ofAdd 0) := by sorry
+      ∀ f : ℬ(𝔸[F]), T f = f (Multiplicative.ofAdd 0) := by
+  have h1 : ((1 : X).comp ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩ :
+      QuasiCharacter I_F) = 1 := ContinuousMonoidHom.ext fun _ ↦ rfl
+  have h2 : adelicEigendistributions (1 : X) =
+      schwartzBruhatEigendistributions (1 : QuasiCharacter 𝔸[F]ˣ) :=
+    congrArg schwartzBruhatEigendistributions h1
+  -- Destructuring the existential with `obtain` unfolds the membership and takes minutes.
+  exact (show ∃ T : StrongDual ℂ ℬ(𝔸[F]),
+      T ∈ schwartzBruhatEigendistributions (1 : QuasiCharacter 𝔸[F]ˣ) ∧
+        ∀ f : ℬ(𝔸[F]), T f = f (Multiplicative.ofAdd 0) from
+    schwartzBruhatEigendistributions_zeroEval).imp
+    fun T hT ↦ ⟨(congrArg (T ∈ ·) h2).mpr hT.1, hT.2⟩
 
 section Gaussians
 
