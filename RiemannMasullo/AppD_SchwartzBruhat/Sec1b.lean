@@ -3086,10 +3086,336 @@ of a second-countable group is nuclear. -/
 theorem schwartzBruhat_strongDual_nuclear [SecondCountableTopology G] :
     IsNuclearTVS.{v} (StrongDual ℂ (SchwartzBruhat G)) := by sorry
 
+/-- The intersection of an open ascending union with a compactly generated subgroup
+is already contained in one member of the union. -/
+private theorem compactlyGenerated_inter_iSup_open {H : Subgroup G}
+    (hH : IsCompactlyGeneratedGroup H) (hHOpen : IsOpen (H : Set G))
+    {J : ℕ → Subgroup G} (hJ : Monotone J)
+    (hOpen : ∀ n, IsOpen (J n : Set G)) :
+    ∃ N, H ⊓ (⨆ n, J n) ≤ J N := by
+  let L : Subgroup G := ⨆ n, J n
+  have hL : IsOpen (L : Set G) := Subgroup.isOpen_mono (le_iSup J 0) (hOpen 0)
+  let M := L.comap H.subtype
+  have hM : IsClosed (M : Set H) :=
+    (L.isClosed_of_isOpen hL).preimage continuous_subtype_val
+  let : LocallyCompactSpace H := hHOpen.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  obtain ⟨K, _, hK, hGen⟩ := isCompactlyGeneratedGroup_closedSubgroup hH M hM
+  let i : M →* G := H.subtype.comp M.subtype
+  have hi : Continuous i := continuous_subtype_val.comp continuous_subtype_val
+  obtain ⟨N, hN⟩ := (hK.image hi).elim_directed_cover
+    (fun n ↦ (J n : Set G)) hOpen (by
+      rw [← Subgroup.coe_iSup_of_directed hJ.directed_le]
+      rintro _ ⟨x, _, rfl⟩
+      exact x.property) (hJ.directed_le.mono fun _ _ h ↦ h)
+  refine ⟨N, fun x hx ↦ ?_⟩
+  have hgen : Subgroup.closure K ≤ (J N).comap i :=
+    Subgroup.closure_le _ |>.mpr fun y hy ↦ hN (mem_image_of_mem i hy)
+  exact hgen (hGen.symm ▸ Subgroup.mem_top (⟨⟨x, hx.1⟩, hx.2⟩ : M))
+
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
+/-- Point evaluation on an elementary Schwartz stage is continuous by the
+zero-order, zero-weight seminorm. -/
+private theorem continuous_schwartzBruhatStage_eval
+    (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient) (x : G) :
+    Continuous (fun f : SchwartzBruhatStage e ↦ schwartzBruhatStageRealization a e f x) := by
+  let L := (LinearMap.proj x).comp (schwartzBruhatStageRealization a e)
+  refine (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp L fun _ ↦ ?_
+  apply Seminorm.continuous_of_le (elementarySchwartz_withSeminorms.continuous_seminorm (0, 0, 0, 0))
+  intro f
+  change ‖schwartzBruhatStageRealization a e f x‖ ≤ elementarySchwartzSeminorm (0, 0, 0, 0) f
+  rw [schwartzBruhatStageRealization_apply]
+  split_ifs with hx
+  · change (‖f _‖₊ : ENNReal).toReal ≤ (elementarySchwartzBound f.val (0, 0, 0, 0)).toReal
+    apply ENNReal.toReal_mono (f.property.2 _).ne
+    rw [elementarySchwartzBound_zero]
+    exact le_iSup (fun y ↦ (‖f y‖₊ : ENNReal)) _
+  · exact norm_zero.trans_le (apply_nonneg _ _)
+
+open Classical in
+/-- Paper: Lemma D.1.5.6, p. 763. The stage projection on functions restricts the
+support to the open subgroup and averages translates over the compact good subgroup. -/
+def schwartzBruhatStageAverage (a : BruhatStructuralPair G) (f : G → ℂ) (x : G) : ℂ :=
+  let k : Subgroup G := OrderDual.ofDual a.val.2
+  letI : MeasurableSpace k := borel k
+  letI : BorelSpace k := ⟨rfl⟩
+  have hk : IsCompact (k : Set G) := by
+    rw [← lcaDualAnnihilator_annihilator k a.property.2.2.1.1]
+    exact isCompact_lcaDualAnnihilator _ a.property.2.2.1.2.1
+  letI : CompactSpace k := isCompact_iff_compactSpace.mp hk
+  let μ := Measure.haarMeasure (⟨⟨univ, isCompact_univ⟩, by simp⟩ : PositiveCompacts k)
+  if x ∈ a.val.1 then ∫ h : k, f (h.val * x) ∂μ else 0
+
+/-- Paper: Lemma D.1.5.6, p. 763. Cutoff and normalized Haar averaging yield a
+continuous stage retraction, with the stated pointwise formula on the limit. -/
+theorem schwartzBruhatStage_average_retraction
+    (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient) :
+    ∃ R : SchwartzBruhat G →L[ℂ] SchwartzBruhatStage e,
+      (∀ f, R (schwartzBruhatStageInclusion a e f) = f) ∧
+        ∀ f x, schwartzBruhatStageRealization a e (R f) x = schwartzBruhatStageAverage a f x := by
+  sorry
+
+/-- For a function from a fixed stage, two comparable cutoff and averaging operations
+agree when their open subgroups have the same intersection with the source support
+subgroup and their averaging subgroups have the same image modulo the source kernel.
+The equality of annihilator intersections expresses the latter condition. -/
+theorem schwartzBruhatStage_average_eq_of_inf
+    {a c : BruhatStructuralPair G} (b : BruhatStructuralPair G) (hac : a ≤ c)
+    (hOpen : a.val.1 ⊓ b.val.1 = c.val.1 ⊓ b.val.1)
+    (hKernel : lcaAnnihilator (OrderDual.ofDual a.val.2) ⊓
+      lcaAnnihilator (OrderDual.ofDual b.val.2) =
+      lcaAnnihilator (OrderDual.ofDual c.val.2) ⊓ lcaAnnihilator (OrderDual.ofDual b.val.2))
+    (e : ElementaryLCAPresentation b.quotient) (f : SchwartzBruhatStage e) :
+    schwartzBruhatStageAverage a (schwartzBruhatStageRealization b e f) =
+      schwartzBruhatStageAverage c (schwartzBruhatStageRealization b e f) := by
+  sorry
+
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
+/-- The inclusion of a stage is continuous by the definition of the generating seminorms. -/
+private theorem continuous_schwartzBruhatStageInclusion
+    (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient) :
+    Continuous (show SchwartzBruhatStage e →ₗ[ℂ] SchwartzBruhat G from
+      schwartzBruhatStageInclusion a e) := by
+  exact (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp _ (fun p ↦ p.2 a e)
+
+/-- The intersections of a fixed stage's open subgroups in the group and its dual
+with the corresponding subgroups in an ascending chain both stabilize. -/
+private theorem schwartzBruhatStage_intersections_stabilize
+    {a : ℕ → BruhatStructuralPair G} (ha : Monotone a) (b : BruhatStructuralPair G) :
+    ∃ N, ∀ n ≥ N,
+      (a n).val.1 ⊓ b.val.1 = (a (n + 1)).val.1 ⊓ b.val.1 ∧
+      lcaAnnihilator (OrderDual.ofDual (a n).val.2) ⊓
+        lcaAnnihilator (OrderDual.ofDual b.val.2) =
+      lcaAnnihilator (OrderDual.ofDual (a (n + 1)).val.2) ⊓
+        lcaAnnihilator (OrderDual.ofDual b.val.2) := by
+  let H (n : ℕ) := (a n).val.1
+  let A (n : ℕ) := lcaAnnihilator (OrderDual.ofDual (a n).val.2)
+  have hH : Monotone H := fun _ _ h ↦ (ha h).1
+  have hA : Monotone A := fun _ _ h χ hχ ↦
+    (mem_lcaAnnihilator_iff _ χ).mpr fun x ↦
+      (mem_lcaAnnihilator_iff _ χ).mp hχ ⟨x, (ha h).2 x.property⟩
+  obtain ⟨N, hN⟩ := compactlyGenerated_inter_iSup_open b.property.2.1 b.property.1 hH
+    (fun n ↦ (a n).property.1)
+  obtain ⟨M, hM⟩ := compactlyGenerated_inter_iSup_open b.property.2.2.1.2.2
+    b.property.2.2.1.2.1 hA (fun n ↦ (a n).property.2.2.1.2.1)
+  refine ⟨max N M, fun n hn ↦ ⟨?_, ?_⟩⟩
+  · exact le_antisymm (inf_le_inf_right _ (hH (Nat.le_succ n)))
+      (le_inf ((inf_le_inf (le_iSup H (n + 1)) le_rfl).trans
+        ((inf_comm _ _).le.trans (hN.trans (hH ((le_max_left _ _).trans hn))))) inf_le_right)
+  · exact le_antisymm (inf_le_inf_right _ (hA (Nat.le_succ n)))
+      (le_inf ((inf_le_inf (le_iSup A (n + 1)) le_rfl).trans
+        ((inf_comm _ _).le.trans (hM.trans (hA ((le_max_right _ _).trans hn))))) inf_le_right)
+
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
+/-- A sequence of linear functionals that eventually vanish on each stage cannot be
+nonzero on a corresponding sequence in a bounded set. The functionals can be rescaled
+and combined into one seminorm continuous on every stage. -/
+private theorem exists_zero_evaluation_of_bounded
+    {E : Type*} [AddCommGroup E] [Module ℂ E]
+    {ι : Type*} {X : ι → Type*} [∀ a, AddCommGroup (X a)] [∀ a, Module ℂ (X a)]
+    [∀ a, TopologicalSpace (X a)] [∀ a, IsTopologicalAddGroup (X a)]
+    (i : ∀ a, X a →ₗ[ℂ] E)
+    (hCover : ∀ u : E, ∃ a, u ∈ range (i a))
+    {B : Set E} (hBound : ∀ p : Seminorm ℂ E, (∀ a, Continuous (p ∘ i a)) →
+      ∃ C : ℝ, ∀ u ∈ B, p u < C)
+    (f : ℕ → E) (hfB : ∀ n, f n ∈ B)
+    (L : ℕ → E →ₗ[ℂ] ℂ)
+    (hL : ∀ n a, Continuous (L n ∘ i a))
+    (hzero : ∀ a, ∃ N, ∀ n ≥ N, ∀ s, L n (i a s) = 0) :
+    ¬ ∀ n, L n (f n) ≠ 0 := by
+  intro hne
+  let w (n : ℕ) : ℝ := (n : ℝ) / ‖L n (f n)‖
+  let p (n : ℕ) : Seminorm ℂ E :=
+    (Real.toNNReal (w n)) • (normSeminorm ℂ ℂ).comp (L n)
+  have hp (n : ℕ) (u : E) : p n u = w n * ‖L n u‖ := by
+    change (↑(Real.toNNReal (w n)) : ℝ) * ‖L n u‖ = w n * ‖L n u‖
+    rw [Real.coe_toNNReal _ (div_nonneg (Nat.cast_nonneg n) (norm_nonneg _))]
+  have hfin (a : ι) : ∃ N, ∀ n (s : X a), p n (i a s) ≤ ((Finset.range N).sup p) (i a s) := by
+    obtain ⟨N, hN⟩ := hzero a
+    refine ⟨N, fun n s ↦ ?_⟩
+    by_cases hn : n < N
+    · exact Seminorm.le_finset_sup_apply (Finset.mem_range.mpr hn)
+    · rw [hp, hN n (Nat.le_of_not_gt hn) s, norm_zero, mul_zero]
+      exact apply_nonneg _ _
+  have hbound : BddAbove (range p) := Seminorm.bddAbove_range_iff.mpr fun u ↦ by
+    obtain ⟨a, s, rfl⟩ := hCover u
+    obtain ⟨N, hN⟩ := hfin a
+    exact ⟨((Finset.range N).sup p) (i a s), forall_mem_range.mpr fun n ↦ hN n s⟩
+  let q : Seminorm ℂ E := ⨆ n, p n
+  have hcont (a : ι) : Continuous (q ∘ i a) := by
+    obtain ⟨N, hN⟩ := hfin a
+    let p' := SeminormFamily.comp p (i a)
+    apply Seminorm.continuous_of_le (p := q.comp (i a))
+      (q := (Finset.range N).sup p')
+    · apply Seminorm.continuous_finsetSup
+      intro n _
+      exact ((hL n a).norm.const_mul (w n)).congr fun s ↦ (hp n (i a s)).symm
+    · intro s
+      rw [← SeminormFamily.finset_sup_comp]
+      change (⨆ n, p n) (i a s) ≤ ((Finset.range N).sup p) (i a s)
+      rw [Seminorm.iSup_apply hbound]
+      exact ciSup_le fun n ↦ hN n s
+  obtain ⟨C, hC⟩ := hBound q hcont
+  obtain ⟨n, hn⟩ := exists_nat_gt C
+  have hpn : p n (f n) = (n : ℝ) := by
+    rw [hp]
+    exact div_mul_cancel₀ _ (norm_ne_zero_iff.mpr (hne n))
+  exact (not_lt_of_ge (hn.le.trans (hpn.ge.trans (le_ciSup hbound n (f n))))) (hC _ (hfB n))
+
+/-- If projections along an ascending chain eventually agree on each fixed stage,
+their successive differences rule out a bounded set escaping every stage. -/
+private theorem bounded_subset_stage_of_projections
+    {E A : Type*} [AddCommGroup E] [Module ℂ E]
+    {ι κ : Type*} [Preorder κ] [Nonempty κ] {X : ι → Type*}
+    [∀ a, AddCommGroup (X a)] [∀ a, Module ℂ (X a)]
+    [∀ a, TopologicalSpace (X a)] [∀ a, IsTopologicalAddGroup (X a)]
+    (i : ∀ a, X a →ₗ[ℂ] E) (hCover : ∀ u : E, ∃ a, u ∈ range (i a))
+    {B : Set E} (hBound : ∀ p : Seminorm ℂ E, (∀ a, Continuous (p ∘ i a)) →
+      ∃ C : ℝ, ∀ u ∈ B, p u < C)
+    (S : κ → Set E) (hNext : ∀ k u, ∃ l, k ≤ l ∧ u ∈ S l)
+    (P : κ → E →ₗ[ℂ] (A → ℂ)) (realize : E → (A → ℂ))
+    (hFix : ∀ k u, P k u = realize u ↔ u ∈ S k)
+    (hCont : ∀ k x b, Continuous (fun s : X b ↦ P k (i b s) x))
+    (hStable : ∀ (a : ℕ → κ), Monotone a → ∀ b, ∃ N, ∀ n ≥ N, ∀ s,
+      P (a (n + 1)) (i b s) = P (a n) (i b s)) :
+    ∃ k, B ⊆ S k := by
+  classical
+  by_contra hEscape
+  simp only [not_exists, not_subset] at hEscape
+  choose f hfB hfOut using hEscape
+  choose next hnext hmem using fun k ↦ hNext k (f k)
+  let a : ℕ → κ := Nat.rec (Classical.choice ‹Nonempty κ›) (fun _ k ↦ next k)
+  have ha : Monotone a := monotone_nat_of_le_succ fun n ↦ hnext (a n)
+  have hPoint (n : ℕ) : ∃ x, P (a (n + 1)) (f (a n)) x ≠ P (a n) (f (a n)) x := by
+    by_contra! h
+    exact hfOut (a n) ((hFix _ _).mp ((funext h).symm.trans ((hFix _ _).mpr (hmem (a n)))))
+  choose x hx using hPoint
+  let L (n : ℕ) : E →ₗ[ℂ] ℂ := (LinearMap.proj (x n)).comp (P (a (n + 1)) - P (a n))
+  apply exists_zero_evaluation_of_bounded i hCover hBound (f ∘ a) (fun n ↦ hfB (a n)) L
+  · exact fun n b ↦ (hCont (a (n + 1)) (x n) b).sub (hCont (a n) (x n) b)
+  · intro b
+    obtain ⟨N, hN⟩ := hStable a ha b
+    exact ⟨N, fun n hn s ↦ sub_eq_zero.mpr (congrFun (hN n hn s) (x n))⟩
+  · exact fun n ↦ sub_ne_zero.mpr (hx n)
+
+/-- An element can be realized in a stage above any given structural pair,
+with any chosen presentation of the larger quotient. -/
+private theorem schwartzBruhat_exists_stage_above
+    (e : ∀ b : BruhatStructuralPair G, ElementaryLCAPresentation b.quotient)
+    (a : BruhatStructuralPair G) (u : schwartzBruhatSubmodule G) :
+    ∃ b, a ≤ b ∧ u ∈ range (schwartzBruhatStageInclusion b (e b)) := by
+  obtain ⟨b, d, s, hs⟩ := (mem_schwartzBruhatSubmodule_iff (G := G) u.val).mp u.property
+  obtain ⟨c, hac, hbc⟩ := (bruhatStructuralPair_filtered (G := G)).2.directed a b
+  obtain ⟨j, hj, _⟩ := schwartzBruhatStage_transition hbc d (e c)
+  exact ⟨c, hac, j s, Subtype.ext ((hj s).trans hs)⟩
+
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
+/-- Each generating seminorm is bounded on every von Neumann bounded set. -/
+private theorem schwartzBruhat_seminorm_bounded {B : Set (SchwartzBruhat G)}
+    (hB : IsVonNBounded ℂ B) (p : Seminorm ℂ (schwartzBruhatSubmodule G))
+    (hp : ∀ (b : BruhatStructuralPair G) (d : ElementaryLCAPresentation b.quotient),
+      Continuous (p ∘ schwartzBruhatStageInclusion b d)) :
+    ∃ C : ℝ, ∀ u ∈ B, p u < C := by
+  let I := {q : Seminorm ℂ (schwartzBruhatSubmodule G) //
+    ∀ (b : BruhatStructuralPair G) (d : ElementaryLCAPresentation b.quotient),
+      Continuous (q ∘ schwartzBruhatStageInclusion b d)}
+  have hSeminorms := withGeneratingSeminorms_spec (schwartzBruhatSubmodule G)
+    (Subtype.val : I → Seminorm ℂ (schwartzBruhatSubmodule G))
+  exact (hSeminorms.isVonNBounded_iff_seminorm_bounded.mp hB ⟨p, hp⟩).imp (fun _ h ↦ h.2)
+
+/-- The stage maps for all pairs and presentations cover the Schwartz–Bruhat space. -/
+private theorem schwartzBruhat_stage_cover (u : schwartzBruhatSubmodule G) :
+    ∃ b : (a : BruhatStructuralPair G) × ElementaryLCAPresentation a.quotient,
+      u ∈ range (schwartzBruhatStageInclusion b.1 b.2) := by
+  exact ((mem_schwartzBruhatSubmodule_iff (G := G) u.val).mp u.property).elim
+    (fun b hb ↦ hb.elim fun d hd ↦ hd.elim fun s hs ↦ ⟨⟨b, d⟩, s, Subtype.ext hs⟩)
+
+/-- Averaging along an ascending chain eventually gives the same result on every
+element of a fixed stage. -/
+private theorem schwartzBruhatStage_average_stabilizes
+    {a : ℕ → BruhatStructuralPair G} (ha : Monotone a)
+    (b : BruhatStructuralPair G) (d : ElementaryLCAPresentation b.quotient) :
+    ∃ N, ∀ n ≥ N, ∀ s : SchwartzBruhatStage d,
+      schwartzBruhatStageAverage (a (n + 1)) (schwartzBruhatStageRealization b d s) =
+      schwartzBruhatStageAverage (a n) (schwartzBruhatStageRealization b d s) := by
+  refine (schwartzBruhatStage_intersections_stabilize (G := G) ha b).imp ?_
+  intro N hN n hn s
+  exact (schwartzBruhatStage_average_eq_of_inf b (ha (Nat.le_succ n))
+    (hN n hn).1 (hN n hn).2 d s).symm
+
+/-- Successive differences of the cutoff and averaging projections force a bounded
+set to lie in one stage. -/
+private theorem schwartzBruhat_bounded_subset_stage
+    {B : Set (SchwartzBruhat G)} (hB : IsVonNBounded ℂ B)
+    (e : ∀ a : BruhatStructuralPair G, ElementaryLCAPresentation a.quotient)
+    (R : ∀ a, SchwartzBruhat G →L[ℂ] SchwartzBruhatStage (e a))
+    (hRi : ∀ a, Function.LeftInverse (R a) (schwartzBruhatStageInclusion a (e a)))
+    (hR : ∀ (a : BruhatStructuralPair G) (u : SchwartzBruhat G) (x : G),
+      schwartzBruhatStageRealization a (e a) (R a u) x = schwartzBruhatStageAverage a u x) :
+    ∃ a, B ⊆ range (schwartzBruhatStageInclusion a (e a)) := by
+  let : Nonempty (BruhatStructuralPair G) := (bruhatStructuralPair_filtered (G := G)).1
+  let i (a : BruhatStructuralPair G) := schwartzBruhatStageInclusion a (e a)
+  let P (b : BruhatStructuralPair G) : schwartzBruhatSubmodule G →ₗ[ℂ] (G → ℂ) :=
+    (schwartzBruhatStageRealization b (e b)).comp (R b).toLinearMap
+  have hP (b : BruhatStructuralPair G) (u : SchwartzBruhat G) :
+      P b u = schwartzBruhatStageAverage b u := funext (hR b u)
+  have hFix (b : BruhatStructuralPair G) (u : SchwartzBruhat G) : P b u = u.val ↔ u ∈ range (i b) :=
+    ⟨fun h ↦ ⟨R b u, Subtype.ext h⟩,
+      fun hu ↦ congrArg (fun w : SchwartzBruhat G ↦ w.val)
+        ((Function.LeftInverse.rightInvOn_range (hRi b)) hu)⟩
+  let J := (b : BruhatStructuralPair G) × ElementaryLCAPresentation b.quotient
+  let j (b : J) := schwartzBruhatStageInclusion b.1 b.2
+  have hBound (p : Seminorm ℂ (schwartzBruhatSubmodule G)) (hp : ∀ b : J, Continuous (p ∘ j b)) :
+      ∃ C : ℝ, ∀ u ∈ B, p u < C :=
+    schwartzBruhat_seminorm_bounded (G := G) hB p (fun b d ↦ hp ⟨b, d⟩)
+  refine bounded_subset_stage_of_projections (X := fun b : J ↦ SchwartzBruhatStage b.2)
+    j (schwartzBruhat_stage_cover (G := G)) hBound (fun b ↦ range (i b))
+    (schwartzBruhat_exists_stage_above (G := G) e) P (fun u ↦ u.val) hFix ?_ ?_
+  · rintro c x ⟨b, d⟩
+    exact (continuous_schwartzBruhatStage_eval c (e c) x).comp
+      ((R c).continuous.comp (continuous_schwartzBruhatStageInclusion b d))
+  · rintro a ha ⟨b, d⟩
+    refine (schwartzBruhatStage_average_stabilizes (G := G) ha b d).imp ?_
+    intro N hN n hn s
+    let u : SchwartzBruhat G := schwartzBruhatStageInclusion b d s
+    exact (hP (a (n + 1)) u).trans ((hN n hn s).trans (hP (a n) u).symm)
+
+/-- A bounded set in the full Schwartz–Bruhat space is the image of a bounded
+set in one stage, obtained by applying that stage's continuous retraction. -/
+private theorem schwartzBruhat_bounded_lift
+    {B : Set (SchwartzBruhat G)} (hB : IsVonNBounded ℂ B) :
+    ∃ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient)
+      (C : Set (SchwartzBruhatStage e)), IsVonNBounded ℂ C ∧
+        (show SchwartzBruhatStage e →ₗ[ℂ] SchwartzBruhat G from
+          schwartzBruhatStageInclusion a e) '' C = B := by
+  let e (a : BruhatStructuralPair G) := Classical.choice a.elementary
+  let R (a : BruhatStructuralPair G) : SchwartzBruhat G →L[ℂ] SchwartzBruhatStage (e a) :=
+    (schwartzBruhatStage_average_retraction a (e a)).choose
+  have hRi (a : BruhatStructuralPair G) :
+      Function.LeftInverse (R a) (schwartzBruhatStageInclusion a (e a)) :=
+    (schwartzBruhatStage_average_retraction a (e a)).choose_spec.1
+  refine (schwartzBruhat_bounded_subset_stage (G := G) hB e R hRi
+    (fun b ↦ (schwartzBruhatStage_average_retraction b (e b)).choose_spec.2)).elim ?_
+  intro a ha
+  let i := schwartzBruhatStageInclusion a (e a)
+  have hInv : LeftInvOn i (R a) B := fun _ hu ↦ (hRi a).rightInvOn_range (ha hu)
+  exact ⟨a, e a, R a '' B, hB.image (R a), hInv.image_image⟩
+
 /-- Paper: Theorem D.1.5.7 and Remark D.1.5.8, p. 764. Closed bounded subsets
 of the Schwartz–Bruhat space are compact, including beyond the second-countable case. -/
 theorem schwartzBruhat_montel :
-    MontelSpace ℂ (SchwartzBruhat G) := by sorry
+    MontelSpace ℂ (SchwartzBruhat G) := by
+  refine ⟨fun B hClosed hBounded ↦ ?_⟩
+  obtain ⟨a, e, C, hC, hImage⟩ := schwartzBruhat_bounded_lift (G := G) hBounded
+  let i : SchwartzBruhatStage e →ₗ[ℂ] SchwartzBruhat G := schwartzBruhatStageInclusion a e
+  have hi : Continuous i := continuous_schwartzBruhatStageInclusion a e
+  let : T2Space (SchwartzBruhatStage e) := elementarySchwartz_t2
+  let : ContinuousSMul ℂ (SchwartzBruhatStage e) := elementarySchwartz_withSeminorms.continuousSMul
+  have hCompact : IsCompact (closure C) :=
+    elementarySchwartz_isCompact_of_isClosed_isVonNBounded isClosed_closure hC.closure
+  have hEq : i '' closure C = B := subset_antisymm
+    ((image_closure_subset_closure_image hi).trans (hImage ▸ hClosed.closure_eq.le))
+    (hImage ▸ image_mono subset_closure)
+  exact hEq ▸ hCompact.image hi
 
 /-- Paper: Theorem D.1.5.7, p. 764. Closed bounded subsets of the strong dual
 of the Schwartz–Bruhat space are compact. -/
